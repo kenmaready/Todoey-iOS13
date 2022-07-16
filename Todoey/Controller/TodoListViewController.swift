@@ -10,8 +10,8 @@ import UIKit
 
 class TodoListViewController: UITableViewController {
     
-    var tasks = ["Wash cat", "Clean dog", "Practice coding"]
-    var selectedRow: Int?
+    let defaults =  UserDefaults.standard
+    var tasks: [Task] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -21,24 +21,28 @@ class TodoListViewController: UITableViewController {
         appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
         navigationItem.standardAppearance = appearance
         navigationItem.scrollEdgeAppearance = appearance
+        // retrieve tasks from memory
+//        tasks = defaults.array(forKey: "tasks") as? [String] ?? []
     }
 
 
     @IBAction func addTaskButtonPressed(_ sender: UIBarButtonItem) {
+        var textField = UITextField()
+        
         let alert = UIAlertController(title: "Add a new task", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add", style: .default) { (action) in
-            let alertTextField = alert.textFields![0]
-            if let newTask = alertTextField.text {
-                if newTask != "" {
-                    print("new task is: \(newTask)")
-                    self.tasks.append(newTask)
+            if let newTaskDescription = textField.text {
+                if newTaskDescription != "" {
+                    print("new task is: \(newTaskDescription)")
+                    self.tasks.append(Task(desc:newTaskDescription))
+//                    self.defaults.set(self.tasks, forKey: "tasks")
                     self.tableView.reloadData()
                 }
             }
         }
         alert.addTextField { (alertTextField) in
             alertTextField.placeholder = "Your new task"
-            
+            textField = alertTextField
         }
         alert.addAction(action)
         present(alert, animated: true, completion: nil)
@@ -59,18 +63,15 @@ extension TodoListViewController {
        let cell = tableView.dequeueReusableCell(withIdentifier: "TodoItemCell", for: indexPath)
        
        // Configure the cell’s contents.
-        cell.textLabel!.text = tasks[indexPath.row]
-        
-//        if let safeRow = selectedRow {
-//            if indexPath.row == safeRow {
-//                cell.backgroundColor = UIColor.systemOrange
-//                cell.textLabel!.textColor = UIColor.white
-//                print("hey?")
-//            } else {
-//                cell.backgroundColor = UIColor.white
-//                cell.textLabel!.textColor = UIColor.black
-//            }
-//        }
+        let cellTask = tasks[indexPath.row]
+        cell.textLabel!.text = cellTask.desc
+        if cellTask.completed {
+            cell.accessoryType = .checkmark
+            cell.backgroundColor = UIColor.lightGray
+        } else {
+            cell.accessoryType = .none
+            cell.backgroundColor = UIColor.white
+        }
            
        return cell
     }
@@ -80,17 +81,15 @@ extension TodoListViewController {
 
 extension TodoListViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        selectedRow = indexPath.row
-        let currentCell = tableView.cellForRow(at: indexPath)
-        
-        if currentCell?.accessoryType == .checkmark {
-            currentCell?.accessoryType = .none
+
+        // toggle complete/incomplete
+        if tasks[indexPath.row].completed {
+            tasks[indexPath.row].completed = false
         } else {
-            currentCell?.accessoryType = .checkmark
+            tasks[indexPath.row].completed = true
         }
         
         tableView.deselectRow(at: indexPath, animated: true)
-
-//        tableView.reloadData()
+        tableView.reloadData()
     }
 }
