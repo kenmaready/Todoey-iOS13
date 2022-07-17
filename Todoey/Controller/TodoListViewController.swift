@@ -12,9 +12,13 @@ class TodoListViewController: UITableViewController {
     
     let defaults =  UserDefaults.standard
     var tasks: [Task] = []
+    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Tasks.plist")
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        print("dataFilePath: \(dataFilePath!)")
+        
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
         appearance.backgroundColor = UIColor.systemBlue
@@ -22,7 +26,9 @@ class TodoListViewController: UITableViewController {
         navigationItem.standardAppearance = appearance
         navigationItem.scrollEdgeAppearance = appearance
         // retrieve tasks from memory
-//        tasks = defaults.array(forKey: "tasks") as? [String] ?? []
+        // tasks = defaults.array(forKey: "tasks") as? [Task] ?? [] // 1. userdefaults
+        loadTasksFromLocalStorage() // 2. custom .plist
+        
     }
 
 
@@ -34,8 +40,9 @@ class TodoListViewController: UITableViewController {
             if let newTaskDescription = textField.text {
                 if newTaskDescription != "" {
                     print("new task is: \(newTaskDescription)")
+                    
                     self.tasks.append(Task(desc:newTaskDescription))
-//                    self.defaults.set(self.tasks, forKey: "tasks")
+                    self.saveTasksToLocalStorage()
                     self.tableView.reloadData()
                 }
             }
@@ -65,13 +72,10 @@ extension TodoListViewController {
        // Configure the cell’s contents.
         let cellTask = tasks[indexPath.row]
         cell.textLabel!.text = cellTask.desc
-        if cellTask.completed {
-            cell.accessoryType = .checkmark
-            cell.backgroundColor = UIColor.lightGray
-        } else {
-            cell.accessoryType = .none
-            cell.backgroundColor = UIColor.white
-        }
+
+        cell.accessoryType = cellTask.completed ? .checkmark : .none
+        cell.textLabel?.textColor = cellTask.completed ? .darkGray : .black
+        cell.backgroundColor = cellTask.completed ? UIColor.lightGray : UIColor.white
            
        return cell
     }
@@ -83,13 +87,39 @@ extension TodoListViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
 
         // toggle complete/incomplete
-        if tasks[indexPath.row].completed {
-            tasks[indexPath.row].completed = false
-        } else {
-            tasks[indexPath.row].completed = true
-        }
+        tasks[indexPath.row].completed = !tasks[indexPath.row].completed
+        saveTasksToLocalStorage()
         
         tableView.deselectRow(at: indexPath, animated: true)
         tableView.reloadData()
+    }
+}
+
+// MARK: - I/O Methods 2. Custom .plist file with Codable
+
+extension TodoListViewController {
+    func saveTasksToLocalStorage() {
+        let encoder = PropertyListEncoder()
+        
+        do {
+            let data = try encoder.encode(self.tasks)
+            try data.write(to: self.dataFilePath!)
+        } catch {
+            print("There was an error when encoding an array of Tasks: \(error)")
+        }
+    }
+    
+    func loadTasksFromLocalStorage() {
+        if let data = try? Data(contentsOf: dataFilePath!) {
+
+            let decoder = PropertyListDecoder()
+            do {
+                tasks = try decoder.decode([Task].self, from: data)
+            } catch {
+                print("There was an error decoding an array of Tasks from local storage: \(error)")
+            }
+        }
+        
+        
     }
 }

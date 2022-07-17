@@ -8,7 +8,7 @@
 
 import Foundation
 
-struct Task {
+struct Task: Codable {
     var desc: String?
     var completed: Bool = false
 }
