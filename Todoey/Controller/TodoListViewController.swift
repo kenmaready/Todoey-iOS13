@@ -10,6 +10,7 @@ import UIKit
 import CoreData
 
 class TodoListViewController: UITableViewController {
+    @IBOutlet weak var searchBar: UISearchBar!
     
     let defaults =  UserDefaults.standard
     var tasks: [Task] = []
@@ -17,6 +18,7 @@ class TodoListViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        searchBar.delegate = self
         
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
@@ -96,6 +98,24 @@ extension TodoListViewController {
         tableView.deselectRow(at: indexPath, animated: true)
         tableView.reloadData()
     }
+    
+    override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
+        return true
+    }
+
+    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        if (editingStyle == .delete) {
+            // handle delete (by removing the data from your array and updating the tableview)
+            print("deleting cell no. \(indexPath.row)")
+
+            context.delete(tasks[indexPath.row])
+            tasks.remove(at: indexPath.row)
+            
+            saveTasksToLocalStorage()
+
+            tableView.reloadData()
+        }
+    }
 }
 
 // MARK: - I/O Methods 2. Custom .plist file with Codable
@@ -118,5 +138,38 @@ extension TodoListViewController {
             print("Error fetching data: \(error)")
         }
         
+    }
+}
+
+// MARK: - SearchBarDelegate methods
+
+extension TodoListViewController: UISearchBarDelegate {
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+
+        // if search is blank, reload full list of tasks:
+        if searchBar.text! == "" {
+            loadTasksFromLocalStorage()
+            tableView.reloadData()
+            return
+        }
+        
+        // otherwise set up a search request:
+        let request: NSFetchRequest<Task> = Task.fetchRequest()
+        
+        // add predicate (search filter)
+        let predicate = NSPredicate(format: "desc CONTAINS[cd] %@", searchBar.text!)
+        request.predicate = predicate
+        
+        // add sorting rules
+        let sortDescriptor = NSSortDescriptor(key: "desc", ascending: true)
+        request.sortDescriptors = [sortDescriptor]
+        
+        do {
+            tasks = try context.fetch(request)
+        } catch {
+            print("Error fetching data: \(error)")
+        }
+        
+        tableView.reloadData()
     }
 }
