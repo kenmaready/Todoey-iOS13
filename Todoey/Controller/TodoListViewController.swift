@@ -7,17 +7,16 @@
 //
 
 import UIKit
+import CoreData
 
 class TodoListViewController: UITableViewController {
     
     let defaults =  UserDefaults.standard
     var tasks: [Task] = []
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Tasks.plist")
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        print("dataFilePath: \(dataFilePath!)")
         
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
@@ -29,6 +28,8 @@ class TodoListViewController: UITableViewController {
         // tasks = defaults.array(forKey: "tasks") as? [Task] ?? [] // 1. userdefaults
         loadTasksFromLocalStorage() // 2. custom .plist
         
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
+        
     }
 
 
@@ -39,9 +40,11 @@ class TodoListViewController: UITableViewController {
         let action = UIAlertAction(title: "Add", style: .default) { (action) in
             if let newTaskDescription = textField.text {
                 if newTaskDescription != "" {
-                    print("new task is: \(newTaskDescription)")
                     
-                    self.tasks.append(Task(desc:newTaskDescription))
+                    let newTask = Task(context: self.context)
+                    newTask.desc = newTaskDescription
+                    
+                    self.tasks.append(newTask)
                     self.saveTasksToLocalStorage()
                     self.tableView.reloadData()
                 }
@@ -99,27 +102,21 @@ extension TodoListViewController {
 
 extension TodoListViewController {
     func saveTasksToLocalStorage() {
-        let encoder = PropertyListEncoder()
         
         do {
-            let data = try encoder.encode(self.tasks)
-            try data.write(to: self.dataFilePath!)
+            try context.save()
         } catch {
-            print("There was an error when encoding an array of Tasks: \(error)")
+            print("Error when trying to save CoreData: \(error)")
         }
     }
     
     func loadTasksFromLocalStorage() {
-        if let data = try? Data(contentsOf: dataFilePath!) {
-
-            let decoder = PropertyListDecoder()
-            do {
-                tasks = try decoder.decode([Task].self, from: data)
-            } catch {
-                print("There was an error decoding an array of Tasks from local storage: \(error)")
-            }
+        let request: NSFetchRequest<Task> = Task.fetchRequest()
+        do {
+            tasks = try context.fetch(request)
+        } catch {
+            print("Error fetching data: \(error)")
         }
-        
         
     }
 }
