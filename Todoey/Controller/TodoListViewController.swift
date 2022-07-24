@@ -14,6 +14,12 @@ class TodoListViewController: UITableViewController {
     
     let defaults =  UserDefaults.standard
     var tasks: [Task] = []
+    var category: Category? {
+        didSet{
+            fetchTasks()
+        }
+    }
+    
     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
     override func viewDidLoad() {
@@ -26,12 +32,7 @@ class TodoListViewController: UITableViewController {
         appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
         navigationItem.standardAppearance = appearance
         navigationItem.scrollEdgeAppearance = appearance
-        // retrieve tasks from memory
-        // tasks = defaults.array(forKey: "tasks") as? [Task] ?? [] // 1. userdefaults
-        loadTasksFromLocalStorage() // 2. custom .plist
-        
-        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
-        
+        self.navigationController?.navigationBar.tintColor = UIColor.white
     }
 
 
@@ -45,10 +46,11 @@ class TodoListViewController: UITableViewController {
                     
                     let newTask = Task(context: self.context)
                     newTask.desc = newTaskDescription
+                    newTask.category = self.category
                     
                     self.tasks.append(newTask)
-                    self.saveTasksToLocalStorage()
-                    self.tableView.reloadData()
+                    self.saveTasks()
+                    self.refresh()
                 }
             }
         }
@@ -84,6 +86,10 @@ extension TodoListViewController {
            
        return cell
     }
+    
+    func refresh() {
+        tableView.reloadData()
+    }
 }
 
 // MARK: - TableView Delegate Methods
@@ -93,10 +99,10 @@ extension TodoListViewController {
 
         // toggle complete/incomplete
         tasks[indexPath.row].completed = !tasks[indexPath.row].completed
-        saveTasksToLocalStorage()
+        saveTasks()
         
         tableView.deselectRow(at: indexPath, animated: true)
-        tableView.reloadData()
+        refresh()
     }
     
     override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
@@ -111,9 +117,9 @@ extension TodoListViewController {
             context.delete(tasks[indexPath.row])
             tasks.remove(at: indexPath.row)
             
-            saveTasksToLocalStorage()
+            saveTasks()
 
-            tableView.reloadData()
+            refresh()
         }
     }
 }
@@ -121,7 +127,7 @@ extension TodoListViewController {
 // MARK: - I/O Methods 2. Custom .plist file with Codable
 
 extension TodoListViewController {
-    func saveTasksToLocalStorage() {
+    func saveTasks() {
         
         do {
             try context.save()
@@ -130,14 +136,21 @@ extension TodoListViewController {
         }
     }
     
-    func loadTasksFromLocalStorage() {
+    func fetchTasks(_ with: NSPredicate? = nil) {
         let request: NSFetchRequest<Task> = Task.fetchRequest()
+        let categoryFilter = NSPredicate(format: "category.name MATCHES %@", self.category!.name!)
+        
+        if let additionalFilter = with {
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryFilter, additionalFilter])
+        } else {
+            request.predicate = categoryFilter
+        }
+        
         do {
             tasks = try context.fetch(request)
         } catch {
             print("Error fetching data: \(error)")
         }
-        
     }
 }
 
@@ -147,29 +160,33 @@ extension TodoListViewController: UISearchBarDelegate {
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
 
         // if search is blank, reload full list of tasks:
-        if searchBar.text! == "" {
-            loadTasksFromLocalStorage()
-            tableView.reloadData()
-            return
+        if searchBar.text == "" {
+            fetchTasks()
+
+        } else {
+            // otherwise set up a search request:
+            let request: NSFetchRequest<Task> = Task.fetchRequest()
+            
+            // add predicate (search filter)
+            let predicate = NSPredicate(format: "desc CONTAINS[cd] %@", searchBar.text!)
+            
+            // add sorting rules
+//            request.sortDescriptors = [NSSortDescriptor(key: "desc", ascending: true)]
+            
+            fetchTasks(predicate)
         }
         
-        // otherwise set up a search request:
-        let request: NSFetchRequest<Task> = Task.fetchRequest()
-        
-        // add predicate (search filter)
-        let predicate = NSPredicate(format: "desc CONTAINS[cd] %@", searchBar.text!)
-        request.predicate = predicate
-        
-        // add sorting rules
-        let sortDescriptor = NSSortDescriptor(key: "desc", ascending: true)
-        request.sortDescriptors = [sortDescriptor]
-        
-        do {
-            tasks = try context.fetch(request)
-        } catch {
-            print("Error fetching data: \(error)")
+        refresh()
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            fetchTasks()
+            refresh()
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder()
+            }
+
         }
-        
-        tableView.reloadData()
     }
 }
