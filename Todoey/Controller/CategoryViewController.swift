@@ -100,11 +100,18 @@ extension CategoryViewController {
     
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
             if (editingStyle == .delete) {
-                // handle delete (by removing the data from your array and updating the tableview)
-
-//                categories.remove()
-                
-//                saveCatsegories()
+                // handle delete (by removing the data from your array and updating the tableview
+                   
+                    if let category = categories?[indexPath.row] {
+                        do {
+                            try realm.write{
+                                realm.delete(category.tasks)
+                                realm.delete(category)
+                            }
+                        } catch {
+                            print("Error deleting category from Realm db: \(error.localizedDescription)")
+                        }
+                    }
 
                 refreshTable()
             }
