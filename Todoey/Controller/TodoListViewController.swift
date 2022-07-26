@@ -7,13 +7,14 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class TodoListViewController: UITableViewController {
     @IBOutlet weak var searchBar: UISearchBar!
     
     let defaults =  UserDefaults.standard
-    var tasks: [Task] = []
+    let realm = try! Realm()
+    var tasks: Results<Task>?
     var category: Category? {
         didSet{
             fetchTasks()
@@ -32,6 +33,7 @@ class TodoListViewController: UITableViewController {
         appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
         navigationItem.standardAppearance = appearance
         navigationItem.scrollEdgeAppearance = appearance
+        self.title = "\(category?.name ?? "") Tasks"
         self.navigationController?.navigationBar.tintColor = UIColor.white
     }
 
@@ -43,14 +45,21 @@ class TodoListViewController: UITableViewController {
         let action = UIAlertAction(title: "Add", style: .default) { (action) in
             if let newTaskDescription = textField.text {
                 if newTaskDescription != "" {
-                    
-                    let newTask = Task(context: self.context)
-                    newTask.desc = newTaskDescription
-                    newTask.category = self.category
-                    
-                    self.tasks.append(newTask)
-                    self.saveTasks()
-                    self.refresh()
+                
+                    if let unwrappedCategory = self.category {
+                        
+                        do {
+                            try self.realm.write() {
+                                let newTask = Task()
+                                newTask.desc = newTaskDescription
+                                unwrappedCategory.tasks.append(newTask)
+                            }
+                        } catch {
+                            print("Error saving new Task: \(error.localizedDescription)")
+                        }
+                        
+                        self.refresh()
+                    }
                 }
             }
         }
@@ -68,7 +77,7 @@ class TodoListViewController: UITableViewController {
 extension TodoListViewController {
     // Return the number of rows for the table.
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return tasks.count
+        return tasks?.count ?? 1
     }
 
     // Provide a cell object for each row.
@@ -77,12 +86,14 @@ extension TodoListViewController {
        let cell = tableView.dequeueReusableCell(withIdentifier: "TodoItemCell", for: indexPath)
        
        // Configure the cell’s contents.
-        let cellTask = tasks[indexPath.row]
-        cell.textLabel!.text = cellTask.desc
-
-        cell.accessoryType = cellTask.completed ? .checkmark : .none
-        cell.textLabel?.textColor = cellTask.completed ? .darkGray : .black
-        cell.backgroundColor = cellTask.completed ? UIColor.lightGray : UIColor.white
+        if let cellTask = tasks?[indexPath.row] {
+            cell.textLabel!.text = cellTask.desc
+            cell.accessoryType = cellTask.completed ? .checkmark : .none
+            cell.textLabel?.textColor = cellTask.completed ? .darkGray : .black
+            cell.backgroundColor = cellTask.completed ? UIColor.lightGray : UIColor.white
+        } else {
+            cell.textLabel!.text = "No tasks added yet"
+        }
            
        return cell
     }
@@ -97,10 +108,16 @@ extension TodoListViewController {
 extension TodoListViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
 
-        // toggle complete/incomplete
-        tasks[indexPath.row].completed = !tasks[indexPath.row].completed
-        saveTasks()
-        
+        if let task = tasks?[indexPath.row] {
+            do {
+                try realm.write{
+                    task.completed = !task.completed
+                }
+            } catch {
+                print("Error changing completed status of task in Realm: \(error)")
+            }
+        }
+
         tableView.deselectRow(at: indexPath, animated: true)
         refresh()
     }
@@ -109,19 +126,19 @@ extension TodoListViewController {
         return true
     }
 
-    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
-        if (editingStyle == .delete) {
-            // handle delete (by removing the data from your array and updating the tableview)
-            print("deleting cell no. \(indexPath.row)")
-
-            context.delete(tasks[indexPath.row])
-            tasks.remove(at: indexPath.row)
-            
-            saveTasks()
-
-            refresh()
-        }
-    }
+//    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+//        if (editingStyle == .delete) {
+//            // handle delete (by removing the data from your array and updating the tableview)
+//            print("deleting cell no. \(indexPath.row)")
+//
+//            context.delete(tasks[indexPath.row])
+//            tasks.remove(at: indexPath.row)
+//
+//            saveTasks()
+//
+//            refresh()
+//        }
+//    }
 }
 
 // MARK: - I/O Methods 2. Custom .plist file with Codable
@@ -137,20 +154,7 @@ extension TodoListViewController {
     }
     
     func fetchTasks(_ with: NSPredicate? = nil) {
-        let request: NSFetchRequest<Task> = Task.fetchRequest()
-        let categoryFilter = NSPredicate(format: "category.name MATCHES %@", self.category!.name!)
-        
-        if let additionalFilter = with {
-            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryFilter, additionalFilter])
-        } else {
-            request.predicate = categoryFilter
-        }
-        
-        do {
-            tasks = try context.fetch(request)
-        } catch {
-            print("Error fetching data: \(error)")
-        }
+        tasks = category?.tasks.sorted(byKeyPath: "desc", ascending: true)
     }
 }
 
@@ -164,14 +168,9 @@ extension TodoListViewController: UISearchBarDelegate {
             fetchTasks()
 
         } else {
-            // otherwise set up a search request:
-            let request: NSFetchRequest<Task> = Task.fetchRequest()
             
-            // add predicate (search filter)
+            // create the predicate (search filter)
             let predicate = NSPredicate(format: "desc CONTAINS[cd] %@", searchBar.text!)
-            
-            // add sorting rules
-//            request.sortDescriptors = [NSSortDescriptor(key: "desc", ascending: true)]
             
             fetchTasks(predicate)
         }

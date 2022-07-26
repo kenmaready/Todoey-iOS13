@@ -7,11 +7,11 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class CategoryViewController: UITableViewController {
-    
-    var categories: [Category] = []
+    let realm = try! Realm()
+    var categories: Results<Category>?
     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
     override func viewDidLoad() {
@@ -33,11 +33,10 @@ class CategoryViewController: UITableViewController {
             if let newCategoryName = textField.text {
                 if newCategoryName != "" {
                     
-                    let newCategory = Category(context: self.context)
+                    let newCategory = Category()
                     newCategory.name = newCategoryName
                     
-                    self.categories.append(newCategory)
-                    self.saveCategories()
+                    self.saveCategory(newCategory)
                     self.refreshTable()
                 }
             }
@@ -55,7 +54,7 @@ class CategoryViewController: UITableViewController {
 extension CategoryViewController{
     // Return the number of rows for the table.
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return categories.count
+        return categories?.count ?? 1
     }
 
     // Provide a cell object for each row.
@@ -64,8 +63,8 @@ extension CategoryViewController{
        let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
        
        // Configure the cell’s contents.
-        let cellCategory = categories[indexPath.row]
-        cell.textLabel!.text = cellCategory.name
+        let cellCategory = categories?[indexPath.row].name ?? "No categories added yet."
+        cell.textLabel!.text = cellCategory
            
        return cell
     }
@@ -91,7 +90,7 @@ extension CategoryViewController {
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         let destinationVC = segue.destination as! TodoListViewController
         if let indexPath = tableView.indexPathForSelectedRow {
-            destinationVC.category = categories[indexPath.row]
+            destinationVC.category = categories?[indexPath.row]
         }
         
     }
@@ -104,10 +103,9 @@ extension CategoryViewController {
             if (editingStyle == .delete) {
                 // handle delete (by removing the data from your array and updating the tableview)
 
-                context.delete(categories[indexPath.row])
-                categories.remove(at: indexPath.row)
+//                categories.remove()
                 
-                saveCategories()
+//                saveCatsegories()
 
                 refreshTable()
             }
@@ -117,18 +115,16 @@ extension CategoryViewController {
 // MARK: - I/O methods
 extension CategoryViewController {
     
-    func fetchCategories(_ request: NSFetchRequest<Category> = Category.fetchRequest()) {
-        do {
-            categories = try context.fetch(request)
-        } catch {
-            print("Error fetching data: \(error)")
-        }
+    func fetchCategories() {
+        categories = realm.objects(Category.self)
     }
 
-    func saveCategories() {
+    func saveCategory(_ category: Category) {
         
         do {
-            try context.save()
+            try realm.write {
+                realm.add(category)
+            }
         } catch {
             print("Error when trying to save CoreData: \(error)")
         }
