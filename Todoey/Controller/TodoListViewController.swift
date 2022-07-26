@@ -21,8 +21,6 @@ class TodoListViewController: UITableViewController {
         }
     }
     
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-
     override func viewDidLoad() {
         super.viewDidLoad()
         searchBar.delegate = self
@@ -126,32 +124,27 @@ extension TodoListViewController {
         return true
     }
 
-//    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
-//        if (editingStyle == .delete) {
-//            // handle delete (by removing the data from your array and updating the tableview)
-//            print("deleting cell no. \(indexPath.row)")
-//
-//            context.delete(tasks[indexPath.row])
-//            tasks.remove(at: indexPath.row)
-//
-//            saveTasks()
-//
-//            refresh()
-//        }
-//    }
+    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        if (editingStyle == .delete) {
+           
+            if let task = tasks?[indexPath.row] {
+                do {
+                    try realm.write{
+                        realm.delete(task)
+                    }
+                } catch {
+                    print("Error deleting task from Realm db: \(error.localizedDescription)")
+                }
+            }
+
+            refresh()
+        }
+    }
 }
 
 // MARK: - I/O Methods 2. Custom .plist file with Codable
 
 extension TodoListViewController {
-    func saveTasks() {
-        
-        do {
-            try context.save()
-        } catch {
-            print("Error when trying to save CoreData: \(error)")
-        }
-    }
     
     func fetchTasks(_ with: NSPredicate? = nil) {
         tasks = category?.tasks.sorted(byKeyPath: "desc", ascending: true)
