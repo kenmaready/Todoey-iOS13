@@ -156,16 +156,17 @@ extension TodoListViewController {
 extension TodoListViewController: UISearchBarDelegate {
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
 
+        
         // if search is blank, reload full list of tasks:
         if searchBar.text == "" {
             fetchTasks()
 
         } else {
-            
+
             // create the predicate (search filter)
-            let predicate = NSPredicate(format: "desc CONTAINS[cd] %@", searchBar.text!)
-            
-            fetchTasks(predicate)
+            let searchFilter = NSPredicate(format: "desc CONTAINS[cd] %@", searchBar.text!)
+            tasks = tasks?.filter(searchFilter).sorted(byKeyPath: "createdAt", ascending: true)
+
         }
         
         refresh()
