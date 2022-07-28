@@ -9,7 +9,7 @@
 import UIKit
 import RealmSwift
 
-class TodoListViewController: UITableViewController {
+class TodoListViewController: SwipeableTableViewController {
     @IBOutlet weak var searchBar: UISearchBar!
     
     let defaults =  UserDefaults.standard
@@ -68,6 +68,18 @@ class TodoListViewController: UITableViewController {
         alert.addAction(action)
         present(alert, animated: true, completion: nil)
     }
+    
+    override func updateModel(at indexPath: IndexPath) {
+        if let task = tasks?[indexPath.row] {
+            do {
+                try realm.write{
+                    realm.delete(task)
+                }
+            } catch {
+                print("Error deleting task from Realm db: \(error.localizedDescription)")
+            }
+        }
+    }
 }
 
 // MARK: - TableView DataSource Methods
@@ -81,7 +93,7 @@ extension TodoListViewController {
     // Provide a cell object for each row.
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
        // Fetch a cell of the appropriate type.
-       let cell = tableView.dequeueReusableCell(withIdentifier: "TodoItemCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
        
        // Configure the cell’s contents.
         if let cellTask = tasks?[indexPath.row] {
@@ -91,6 +103,7 @@ extension TodoListViewController {
             cell.backgroundColor = cellTask.completed ? UIColor.lightGray : UIColor.white
         } else {
             cell.textLabel!.text = "No tasks added yet"
+            cell.textLabel?.textColor = .darkGray
         }
            
        return cell
@@ -118,27 +131,6 @@ extension TodoListViewController {
 
         tableView.deselectRow(at: indexPath, animated: true)
         refresh()
-    }
-    
-    override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
-        return true
-    }
-
-    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
-        if (editingStyle == .delete) {
-           
-            if let task = tasks?[indexPath.row] {
-                do {
-                    try realm.write{
-                        realm.delete(task)
-                    }
-                } catch {
-                    print("Error deleting task from Realm db: \(error.localizedDescription)")
-                }
-            }
-
-            refresh()
-        }
     }
 }
 

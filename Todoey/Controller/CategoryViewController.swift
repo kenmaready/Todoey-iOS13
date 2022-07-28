@@ -8,8 +8,10 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
-class CategoryViewController: UITableViewController {
+class CategoryViewController: SwipeableTableViewController {
+
     let realm = try! Realm()
     var categories: Results<Category>?
     
@@ -47,6 +49,19 @@ class CategoryViewController: UITableViewController {
         alert.addAction(action)
         present(alert, animated: true, completion: nil)
     }
+    
+    override func updateModel(at indexPath: IndexPath) {
+        if let category = self.categories?[indexPath.row] {
+            do {
+                try self.realm.write{
+                    self.realm.delete(category.tasks)
+                    self.realm.delete(category)
+                }
+            } catch {
+                print("Error deleting category from Realm db: \(error.localizedDescription)")
+            }
+        }
+    }
 }
 
 // MARK: - TableViewDataSource methods
@@ -58,17 +73,22 @@ extension CategoryViewController{
 
     // Provide a cell object for each row.
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-       // Fetch a cell of the appropriate type.
-       let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
-       
-       // Configure the cell’s contents.
-        let cellCategory = categories?[indexPath.row].name ?? "No categories added yet."
-        cell.textLabel!.text = cellCategory
+        
+        // get swipeable configured cell from Swipeable (parent) class
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
+        
+        // Configure the cell’s contents.
+        if let cellCategory = categories?[indexPath.row] {
+            cell.textLabel!.text = cellCategory.name
+        } else {
+            cell.textLabel!.text = "No categories added yet"
+        }
            
        return cell
     }
     
     func refreshTable() {
+        print("refreshing table...")
         tableView.reloadData()
     }
 }
@@ -93,29 +113,6 @@ extension CategoryViewController {
         }
         
     }
-    
-    override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
-        return true
-    }
-    
-    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
-            if (editingStyle == .delete) {
-                // handle delete (by removing the data from your array and updating the tableview
-                   
-                    if let category = categories?[indexPath.row] {
-                        do {
-                            try realm.write{
-                                realm.delete(category.tasks)
-                                realm.delete(category)
-                            }
-                        } catch {
-                            print("Error deleting category from Realm db: \(error.localizedDescription)")
-                        }
-                    }
-
-                refreshTable()
-            }
-        }
 }
 
 // MARK: - I/O methods
