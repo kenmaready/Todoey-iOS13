@@ -36,7 +36,7 @@ class CategoryViewController: SwipeableTableViewController {
                     
                     let newCategory = Category()
                     newCategory.name = newCategoryName
-                    
+                    newCategory.colorCode = (UIColor(randomFlatColorOf: .light)).hexValue()
                     self.saveCategory(newCategory)
                     self.refreshTable()
                 }
@@ -78,8 +78,12 @@ extension CategoryViewController{
         let cell = super.tableView(tableView, cellForRowAt: indexPath)
         
         // Configure the cell’s contents.
-        if let cellCategory = categories?[indexPath.row] {
-            cell.textLabel!.text = cellCategory.name
+        if let category = categories?[indexPath.row] {
+            cell.textLabel!.text = category.name
+            
+            let backgroundColor = UIColor.init(hexString: category.colorCode ?? "ffffff")
+            cell.backgroundColor = backgroundColor
+            cell.textLabel?.textColor = ContrastColorOf(backgroundColor: backgroundColor!, returnFlat: true)
         } else {
             cell.textLabel!.text = "No categories added yet"
         }

@@ -8,6 +8,7 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
 class TodoListViewController: SwipeableTableViewController {
     @IBOutlet weak var searchBar: UISearchBar!
@@ -18,21 +19,44 @@ class TodoListViewController: SwipeableTableViewController {
     var category: Category? {
         didSet{
             fetchTasks()
+            self.navigationController?.navigationBar.barTintColor = UIColor(hexString: category?.colorCode)
         }
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
         searchBar.delegate = self
-        
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithTransparentBackground()
-        appearance.backgroundColor = UIColor.systemBlue
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-        navigationItem.standardAppearance = appearance
-        navigationItem.scrollEdgeAppearance = appearance
-        self.title = "\(category?.name ?? "") Tasks"
-        self.navigationController?.navigationBar.tintColor = UIColor.white
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        if let catColor = category?.colorCode {
+            print("current navigation.barTintColor is: \(self.navigationController?.navigationBar.barTintColor)")
+            print("Setting navigationBar.barTintColor to: \(catColor)")
+            
+            let color = UIColor(hexString: catColor)!
+
+            let appearance = UINavigationBarAppearance()
+            let navBar = navigationController?.navigationBar
+            let navItem = navigationController?.navigationItem
+            let contrastColor = ContrastColorOf(backgroundColor: color, returnFlat: true)
+            
+            appearance.configureWithOpaqueBackground()
+            appearance.titleTextAttributes = [.foregroundColor: contrastColor]
+            appearance.largeTitleTextAttributes = [.foregroundColor: contrastColor]
+            appearance.backgroundColor = color
+            
+            navItem?.rightBarButtonItem?.tintColor = contrastColor
+            navBar?.tintColor = contrastColor
+            navBar?.standardAppearance = appearance
+            navBar?.scrollEdgeAppearance = appearance
+            
+            self.title = "\(category?.name ?? "") Tasks"
+            searchBar.barTintColor = color
+            searchBar.tintColor = contrastColor
+            
+            self.navigationController?.navigationBar.setNeedsLayout()
+            
+        }
     }
 
 
@@ -99,8 +123,12 @@ extension TodoListViewController {
         if let cellTask = tasks?[indexPath.row] {
             cell.textLabel!.text = cellTask.desc
             cell.accessoryType = cellTask.completed ? .checkmark : .none
-            cell.textLabel?.textColor = cellTask.completed ? .darkGray : .black
-            cell.backgroundColor = cellTask.completed ? UIColor.lightGray : UIColor.white
+            
+            let baseBackgroundColor = UIColor.init(hexString: category?.colorCode ?? "ffffff").lighten(byPercentage: 0.60)
+            
+            let backgroundColor = baseBackgroundColor!.darken(byPercentage: 0.4 * (CGFloat(indexPath.row) + 1.0) / (CGFloat(tasks?.count ?? indexPath.row + 1)))
+            cell.backgroundColor = cellTask.completed ? UIColor.lightGray : backgroundColor
+            cell.textLabel?.textColor = cellTask.completed ? .darkGray : ContrastColorOf(backgroundColor: backgroundColor!, returnFlat: true)
         } else {
             cell.textLabel!.text = "No tasks added yet"
             cell.textLabel?.textColor = .darkGray
